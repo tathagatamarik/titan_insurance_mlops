@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insurance-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insurance-api
+  template:
+    metadata:
+      labels:
+        app: insurance-api
+    spec:
+      containers:
+      - name: insurance-api
+        image: titanregistryc9907fc8.azurecr.io/insurance-model:latest
+        ports:
+        - containerPort: 5000
