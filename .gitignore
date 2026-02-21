@@ -2,3 +2,28 @@
 infrastructure/.terraform/
 *.tfstate
 *.tfstate.backup
+
+# Python Artifacts
+__pycache__/
+*.py[cod]
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# MLOps & Data Files
+data/*.csv
+data/*.parquet
+data/registry.db
+mlruns/
+mlflow.db
+*.pkl
+*.model
+
+# OS generated files
+.DS_Store
+Thumbs.db

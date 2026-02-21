@@ -1,16 +1,21 @@
 from flask import Flask, request, jsonify, render_template_string
+from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 import joblib
 import pandas as pd
 import os
 
 app = Flask(__name__)
 
-# 1. Load Model
+# --- 1. Load the AI Brain ---
 base_path = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(base_path, 'insurance_model.pkl')
 model = joblib.load(model_path)
 
-# 2. Define the User Interface (HTML)
+# --- 2. Initialize Prometheus Metrics ---
+# A "Gauge" is a metric dial that can go up and down (perfect for drift scores)
+drift_score_gauge = Gauge('model_data_drift_score', 'Data drift score calculated by Evidently')
+
+# --- 3. Define the User Interface (HTML) ---
 HTML_INTERFACE = """
 <!DOCTYPE html>
 <html>
@@ -60,14 +65,16 @@ HTML_INTERFACE = """
 </html>
 """
 
+# --- 4. Web Routes ---
+
 @app.route('/')
 def home():
-    # Serve the HTML Form
+    # Serve the visual HTML form
     return render_template_string(HTML_INTERFACE)
 
 @app.route('/predict_ui', methods=['POST'])
 def predict_ui():
-    # Handle Form Submission from the Browser
+    # Handle human submissions from the browser
     try:
         age = int(request.form['age'])
         bmi = float(request.form['bmi'])
@@ -77,20 +84,37 @@ def predict_ui():
         data = pd.DataFrame([[age, bmi, children, smoker]], columns=['age', 'bmi', 'children', 'smoker'])
         prediction = model.predict(data)[0]
         
+        # 🚨 MLOps: Calculate & Broadcast Drift!
+        # Mock logic: If a smoker applies, we pretend data drifted and spike the score to 0.85
+        current_drift_score = 0.85 if smoker == 'yes' else 0.05
+        drift_score_gauge.set(current_drift_score)
+        
         return render_template_string(HTML_INTERFACE, prediction=round(prediction, 2))
     except Exception as e:
         return f"Error: {str(e)}"
 
 @app.route('/predict', methods=['POST'])
 def predict_api():
-    # Keep the original API for the code test
+    # Handle robotic JSON submissions (for the testing script)
     try:
         data = request.json
         df = pd.DataFrame(data)
         prediction = model.predict(df)
+        
+        # 🚨 MLOps: Calculate & Broadcast Drift!
+        is_smoker = str(df['smoker'].iloc[0]).lower()
+        current_drift_score = 0.85 if is_smoker == 'yes' else 0.05
+        drift_score_gauge.set(current_drift_score)
+        
         return jsonify({'prediction': prediction.tolist(), 'status': 'success'})
     except Exception as e:
         return jsonify({'error': str(e), 'status': 'error'})
 
+# --- 5. The MLOps Scrape Endpoint ---
+@app.route('/metrics')
+def metrics():
+    # Prometheus visits this URL every 10 seconds to read the gauges
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001)
